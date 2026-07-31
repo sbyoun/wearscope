@@ -17,7 +17,7 @@ import AVFAudio
 #endif
 
 public struct WSConfig: Sendable {
-  public static let sdkVersion = "0.2.0"
+  public static let sdkVersion = "0.4.0"
 
   let apiKey: String
   let endpoint: URL?
