@@ -5,7 +5,7 @@
 
 name: WearBench
 options:
-  bundleIdPrefix: com.cjaiproduct
+  bundleIdPrefix: com.example
   deploymentTarget:
     iOS: "17.0"
   createIntermediateGroups: true
@@ -68,7 +68,7 @@ targets:
         WSEndpoint: $(WS_ENDPOINT)
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.cjaiproduct.wearbench
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.wearbench
         MARKETING_VERSION: "0.3"
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "5.0"

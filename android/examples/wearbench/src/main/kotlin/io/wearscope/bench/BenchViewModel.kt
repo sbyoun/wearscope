@@ -135,7 +135,7 @@ class BenchViewModel(app: Application) : AndroidViewModel(app) {
       return
     }
     WearScopeDAT.observeSession(session)
-    session.start()   // Android DAT: 세션은 명시적으로 시작해야 STARTED로 간다
+    session.start()   // Android DAT requires an explicit start to reach STARTED
 
     val report = mutableListOf<String>()
     for ((label, quality) in listOf("medium" to VideoQuality.MEDIUM, "high" to VideoQuality.HIGH)) {
