@@ -32,10 +32,20 @@ replayable as a timeline.
 - **Explanations, not just events.** Known DAT failures arrive with root cause and
   fix attached, from a catalog built on real hardware.
 
-> Status: **v0.5 developer preview** — SDKs (iOS + Android) are dogfooded on real
-> hardware; the hosted cloud (anonymous provisioning, public baselines) is rolling
-> out. Without a reachable server the SDK records to a local file and retries next
-> launch, so integration never blocks your app.
+> Status: **v0.5 developer preview.** iOS + Android SDKs dogfooded on real hardware;
+> the hosted cloud is live. If the server is ever unreachable the SDK records to a
+> local file and retries next launch, so integration never blocks your app.
+
+### See the data before you install anything
+
+- **[Explore](https://gs.foldalpha.com/explore)** — the ecosystem right now
+- **[Leaderboard](https://gs.foldalpha.com/public/leaderboard)** — warm-open, capture
+  latency and fps per glasses model · **[Failure ranking](https://gs.foldalpha.com/public/failures)** —
+  what actually breaks, how often, and why
+- **[Baselines](https://gs.foldalpha.com/public/stats/metrics?name=warm_open)** —
+  `?name=<metric>&by=glasses_model|device_model|os_version|dat_version`
+
+All public, no auth. Send data and you also get "your number vs the fleet".
 
 ## Why
 

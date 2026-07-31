@@ -76,6 +76,18 @@ do not add new types (servers and dashboards depend on the taxonomy).
 - Do not add configuration files, environment variables, or build flags for
   WearScope. `start()` is the whole setup.
 
+## Public data (no auth, useful before and after integrating)
+
+```
+GET https://gs.foldalpha.com/public/summary        # ecosystem totals
+GET https://gs.foldalpha.com/public/leaderboard    # per-glasses warm_open / capture / fps
+GET https://gs.foldalpha.com/public/failures       # failure-mode frequency + explanations
+GET https://gs.foldalpha.com/public/stats/metrics?name=warm_open&by=glasses_model
+GET https://gs.foldalpha.com/llms.txt              # this API, summarized for agents
+```
+
+Use these to answer "is 15 s to open a stream normal?" without guessing.
+
 ## Verifying the integration
 
 1. Run the app. The console/logcat prints one `[WearScope]` line with either a
