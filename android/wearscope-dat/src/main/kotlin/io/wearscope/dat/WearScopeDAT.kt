@@ -109,7 +109,9 @@ object WearScopeDAT {
       pm.getApplicationInfo(context.packageName, PackageManager.GET_META_DATA).metaData
     }.getOrNull()
     for (key in listOf("com.meta.wearable.mwdat.APPLICATION_ID", "com.meta.wearable.mwdat.CLIENT_TOKEN")) {
-      val value = meta?.getString(key) ?: ""
+      // A numeric-looking manifest value is bundled as Int/Long, so getString() returns null
+      // even when the credential is present — read it type-agnostically.
+      val value = meta?.get(key)?.toString().orEmpty()
       if (value.isBlank() || value.startsWith("\${")) {
         issues.add("meta-data $key is empty — check Dev Center credential injection (manifestPlaceholders)")
       }

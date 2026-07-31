@@ -135,6 +135,7 @@ class BenchViewModel(app: Application) : AndroidViewModel(app) {
       return
     }
     WearScopeDAT.observeSession(session)
+    session.start()   // Android DAT: 세션은 명시적으로 시작해야 STARTED로 간다
 
     val report = mutableListOf<String>()
     for ((label, quality) in listOf("medium" to VideoQuality.MEDIUM, "high" to VideoQuality.HIGH)) {
@@ -172,6 +173,7 @@ class BenchViewModel(app: Application) : AndroidViewModel(app) {
         .getOrNull() ?: return null
     WearScopeDAT.observeStream(stream, label)
     WearScopeDAT.observeFrames(stream, label = label)
+    stream.start()
 
     var frames = 0
     var res = ""
@@ -213,6 +215,8 @@ class BenchViewModel(app: Application) : AndroidViewModel(app) {
     val stream = session
         .addStream(StreamConfiguration(videoQuality = VideoQuality.MEDIUM, frameRate = 15, compressVideo = false))
         .getOrNull() ?: return listOf("photo: stream failed")
+    WearScopeDAT.observeStream(stream, "photo")
+    stream.start()
     var waited = 0L
     while (stream.state.value != StreamState.STREAMING && waited < 30_000) { delay(200); waited += 200 }
     if (stream.state.value != StreamState.STREAMING) { stream.stop(); return listOf("photo: stream start failed") }
