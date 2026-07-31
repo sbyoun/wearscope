@@ -124,10 +124,13 @@ public enum WearScopeDAT {
   /// Observe a camera stream: records every state transition (300 ms sampling),
   /// stream errors (with failure-mode explanations), and photo arrivals.
   public static func observe(stream: MWDATCamera.Stream, label: String = "stream") {
-    tokens.append(stream.errorPublisher.listen { error in
+    // Listener tokens are scoped to this stream and released when it stops —
+    // keeping them alive can retain the old Stream and wedge the next open.
+    var streamTokens: [any AnyListenerToken] = []
+    streamTokens.append(stream.errorPublisher.listen { error in
       WearScope.trackError(error.description, context: "dat.\(label)")
     })
-    tokens.append(stream.photoDataPublisher.listen { photo in
+    streamTokens.append(stream.photoDataPublisher.listen { photo in
       var attrs = ["bytes": "\(photo.data.count)", "label": label]
       if let (w, h) = imageDims(photo.data) {  // actual pixel resolution — header read only (no decoding)
         attrs["w"] = "\(w)"
@@ -152,6 +155,7 @@ public enum WearScopeDAT {
         if s.state == .stopped { break }
         try? await Task.sleep(nanoseconds: 300_000_000)
       }
+      streamTokens.removeAll()  // release subscriptions with the stream
     }
   }
 
@@ -163,10 +167,11 @@ public enum WearScopeDAT {
                                    reportEvery seconds: UInt64 = 5,
                                    label: String = "stream") {
     let stats = FrameStats()
-    tokens.append(stream.videoFramePublisher.listen { frame in
+    var frameToken: (any AnyListenerToken)? = stream.videoFramePublisher.listen { frame in
       stats.mark(dims: frameDims(frame))
-    })
+    }
     Task { @MainActor [weak stream] in
+      defer { frameToken = nil }  // release the frame subscription with the stream
       while let s = stream, s.state != .stopped {
         try? await Task.sleep(nanoseconds: seconds * 1_000_000_000)
         if let report = stats.drain(windowSeconds: Double(seconds)) {
