@@ -24,6 +24,7 @@ public enum WearScopeDAT {
 
   private static var tokens: [any AnyListenerToken] = []
   private static var linkObserved = Set<String>()
+  private static var lastLinkState: [String: String] = [:]
 
   // MARK: - Wearables (registration · devices · environment)
 
@@ -103,11 +104,20 @@ public enum WearScopeDAT {
             let device = wearables.deviceForIdentifier(id) else { continue }
       linkObserved.insert(key)
       let name = device.nameOrId()
-      WearScope.track(.sessionState, "link", ["device": name, "state": "\(device.linkState)"])
+      trackLink(key: key, device: name, state: "\(device.linkState)")
       tokens.append(device.addLinkStateListener { state in
-        WearScope.track(.sessionState, "link", ["device": name, "state": "\(state)"])
+        Task { @MainActor in trackLink(key: key, device: name, state: "\(state)") }
       })
     }
+  }
+
+  /// Deduplicate repeated same-state link callbacks — only transitions are worth a timeline row.
+  private static var lastLinkState: [String: String] = [:]
+
+  private static func trackLink(key: String, device: String, state: String) {
+    guard lastLinkState[key] != state else { return }
+    lastLinkState[key] = state
+    WearScope.track(.sessionState, "link", ["device": device, "state": state])
   }
 
   // MARK: - Stream (state transitions · errors · photo arrivals)
