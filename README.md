@@ -22,6 +22,8 @@ Swift Package Manager:
 .package(url: "https://github.com/sbyoun/wearscope", from: "0.1.0")
 ```
 
+No signup, no dashboard tour before you have data: `start()` provisions an anonymous project on first launch, caches the key on device, and prints where to look. Claim it into an account later, self-host with `endpoint:`, or stay local-only — nothing is locked in.
+
 Requires iOS 17+. The `WearScope` core library has zero dependencies; the optional `WearScopeDAT` auto-instrumentation product depends on the Meta Wearables DAT package (0.8.0).
 
 **Android (Kotlin):** same SDK, same wire format — see [`android/`](android/README.md). Consumed as Gradle modules from a sibling checkout (`minSdk 31`, zero-dependency core).
@@ -32,8 +34,9 @@ Requires iOS 17+. The `WearScope` core library has zero dependencies; the option
 import WearScope
 import WearScopeDAT
 
-// At app launch. Without an endpoint, events are recorded to a local file only.
-WearScope.start(apiKey: "ws_dev")
+// At app launch. No API key, no signup: the first run provisions an anonymous
+// project and logs your dashboard URL. (Pass apiKey:/endpoint: to use your own.)
+WearScope.start()
 WearScope.observeAudioRoutes()          // detects silent glasses→phone mic fallbacks
 
 // One line each — full auto-instrumentation:
@@ -105,6 +108,7 @@ Respond `2xx` to acknowledge. Deduplicate on `events[].id`, upsert sessions on `
 - ~~v0.2 — DAT auto-instrumentation adapter, reference ingest server + session-timeline dashboard~~ ✅
 - ~~v0.3 — benchmark/example app~~ ✅ · fleet baselines (per-device/firmware segments)
 - ~~v0.4 — Android (Kotlin) SDK~~ ✅ (core + DAT adapter + preflight, dogfooded)
+- v0.5 — zero-config provisioning ✅ · public fleet baselines & benchmark leaderboard (in progress)
 - v1.0 — hosted dashboard, self-serve projects
 
 ## License

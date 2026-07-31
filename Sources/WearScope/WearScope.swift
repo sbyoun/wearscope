@@ -24,6 +24,14 @@ public struct WSConfig: Sendable {
   let appInfo: WSEnvelope.App
   let deviceInfo: WSEnvelope.Device
 
+  /// Reuse device/app metadata from an existing config (zero-config adoption).
+  init(apiKey: String, endpoint: URL?, inheriting old: WSConfig) {
+    self.apiKey = apiKey
+    self.endpoint = endpoint
+    self.appInfo = old.appInfo
+    self.deviceInfo = old.deviceInfo
+  }
+
   init(apiKey: String, endpoint: URL?) {
     self.apiKey = apiKey
     self.endpoint = endpoint
@@ -52,6 +60,35 @@ public enum WearScope {
   public static func start(apiKey: String, endpoint: URL? = nil) {
     let config = WSConfig(apiKey: apiKey, endpoint: endpoint)
     Task { await WSCore.shared.start(config: config) }
+  }
+
+  /// Zero-config start — no API key, no signup.
+  ///
+  /// First launch asks the cloud for an anonymous project, caches the credentials,
+  /// and prints the dashboard URL once. Later launches reuse the cached key. If the
+  /// server is unreachable the SDK simply runs in local mode and retries next launch,
+  /// so instrumentation never blocks or crashes an app.
+  ///
+  /// Pass `endpoint:` to self-host. Data is claimable into an account later.
+  public static func start(endpoint: URL? = nil) {
+    let target = endpoint ?? WSProvisioning.defaultEndpoint
+    if let cached = WSProvisioning.cached() {
+      WSProvisioning.announce(cached, fresh: false)
+      start(apiKey: cached.apiKey, endpoint: target)
+      return
+    }
+    // Buffer locally from the very first event; upload begins once a key exists.
+    start(apiKey: "", endpoint: nil)
+    Task {
+      let name = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String
+        ?? Bundle.main.bundleIdentifier ?? "wearscope-app"
+      guard let creds = await WSProvisioning.provision(endpoint: target, appName: name) else {
+        print("[WearScope] Cloud unavailable — running in local mode (events kept on device)")
+        return
+      }
+      WSProvisioning.announce(creds, fresh: true)
+      await WSCore.shared.adopt(apiKey: creds.apiKey, endpoint: target)
+    }
   }
 
   /// Record an event. attrs is metadata only (no payloads — privacy principle).

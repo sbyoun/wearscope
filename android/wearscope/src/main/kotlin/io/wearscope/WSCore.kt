@@ -76,6 +76,18 @@ internal object WSCore {
 
   fun exportFile(): File? = file
 
+  /**
+   * Switch a running local-mode session to cloud mode once credentials arrive
+   * (zero-config provisioning). Events buffered so far upload on the next flush.
+   */
+  fun adopt(apiKey: String, endpoint: String) {
+    executor.execute {
+      this.apiKey = apiKey
+      this.endpoint = endpoint.trimEnd('/')
+    }
+    add(WSEvent(WSEventType.CUSTOM, "provisioned", mapOf("mode" to "cloud")))
+  }
+
   // MARK: - Internals (all on the executor thread only)
 
   private fun flushNow() {

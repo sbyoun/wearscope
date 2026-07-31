@@ -53,6 +53,14 @@ actor WSCore {
 
   var localFileURL: URL? { fileURL }
 
+  /// Switch a running local-mode session to cloud mode once credentials arrive
+  /// (zero-config provisioning). Events buffered so far upload on the next flush.
+  func adopt(apiKey: String, endpoint: URL) {
+    guard let old = config else { return }
+    config = WSConfig(apiKey: apiKey, endpoint: endpoint, inheriting: old)
+    add(WSEvent(type: .custom, name: "provisioned", attrs: ["mode": "cloud"]))
+  }
+
   // MARK: - Events
 
   func add(_ event: WSEvent) {

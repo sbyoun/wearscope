@@ -10,6 +10,7 @@
 package io.wearscope
 
 import android.content.Context
+import android.util.Log
 import android.media.AudioDeviceCallback
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
@@ -30,6 +31,42 @@ object WearScope {
         "locale" to Locale.getDefault().toString(),
         "timezone" to TimeZone.getDefault().id,
     ))
+  }
+
+  /**
+   * Zero-config start — no API key, no signup.
+   *
+   * First launch asks the cloud for an anonymous project, caches the credentials,
+   * and logs the dashboard URL once. Later launches reuse the cached key. If the
+   * server is unreachable the SDK runs in local mode and retries next launch, so
+   * instrumentation never blocks or crashes an app.
+   *
+   * Pass [endpoint] to self-host. Data is claimable into an account later.
+   */
+  @JvmStatic
+  @JvmOverloads
+  fun start(context: Context, endpoint: String? = null) {
+    val app = context.applicationContext
+    val target = endpoint ?: WSProvisioning.DEFAULT_ENDPOINT
+    WSProvisioning.cached(app)?.let { cached ->
+      WSProvisioning.announce(cached, fresh = false)
+      start(app, cached.apiKey, target)
+      return
+    }
+    // Buffer locally from the very first event; upload begins once a key exists.
+    start(app, "", null)
+    Thread {
+      val name = runCatching {
+        app.packageManager.getApplicationLabel(app.applicationInfo).toString()
+      }.getOrDefault(app.packageName)
+      val creds = WSProvisioning.provision(app, target, name)
+      if (creds == null) {
+        Log.i("WearScope", "Cloud unavailable — local mode (events kept on device)")
+      } else {
+        WSProvisioning.announce(creds, fresh = true)
+        WSCore.adopt(creds.apiKey, target)
+      }
+    }.apply { isDaemon = true }.start()
   }
 
   /** Record an event. attrs is metadata only (no payloads — privacy principle). */
