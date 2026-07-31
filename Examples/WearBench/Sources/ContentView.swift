@@ -48,6 +48,12 @@ struct ContentView: View {
 
         Section("WearScope") {
           NavigationLink("View event timeline") { TimelineView() }
+          NavigationLink("Compare with the fleet") { LeaderboardView(mine: bench.lastRun) }
+          Toggle("Share results to public leaderboard", isOn: $bench.shareResults)
+          Text("Anonymous metrics only — timings, fps and resolutions. "
+               + "Turn this off and the device measures without contributing.")
+            .font(.caption2)
+            .foregroundStyle(.secondary)
         }
       }
       .navigationTitle("WearBench")

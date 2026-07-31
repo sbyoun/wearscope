@@ -1,5 +1,7 @@
 # Contributing to WearScope
 
+Hosted backend, public baselines and failure rankings: https://gs.foldalpha.com
+
 WearScope is a **vendor-neutral instrumentation layer for smart-glasses apps**:
 a shared event model (`sessionState` · `stream` · `photo` · `audioRoute` · `thermal` ·
 `error` · `metric` · `custom`) plus per-vendor adapters that auto-instrument each

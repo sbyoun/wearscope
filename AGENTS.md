@@ -1,7 +1,8 @@
 # Integrating WearScope (instructions for coding agents)
 
 You are adding observability to a smart-glasses app built on the Meta Wearables
-Device Access Toolkit (DAT). Follow the platform section below verbatim; it is
+Device Access Toolkit (DAT). Backend and dashboard: https://gs.foldalpha.com
+(machine-readable summary: https://gs.foldalpha.com/llms.txt). Follow the platform section below verbatim; it is
 three lines of setup plus one call per stream. Do not invent configuration —
 there is none beyond what is listed here.
 

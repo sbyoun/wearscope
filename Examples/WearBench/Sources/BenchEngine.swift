@@ -11,6 +11,7 @@ import WearScope
 import WearScopeDAT
 import MWDATCamera
 import MWDATCore
+import SwiftUI
 
 @MainActor
 final class BenchEngine: ObservableObject {
@@ -21,6 +22,12 @@ final class BenchEngine: ObservableObject {
   @Published private(set) var running = false
   @Published private(set) var lines: [String] = []
   @Published private(set) var summary: String?
+  /// Latest run, keyed by the metric names the public leaderboard uses.
+  @Published private(set) var lastRun: [String: Int] = [:]
+
+  /// Bench results feed the public leaderboard so everyone gets baselines.
+  /// Opt out here and this device stops contributing (it still measures locally).
+  @AppStorage("wearbench.shareResults") var shareResults = true
 
   private var manager: DeviceSessionManager?
   private var tokens: [any AnyListenerToken] = []
@@ -152,10 +159,13 @@ final class BenchEngine: ObservableObject {
       let line = "\(name): open \(result.openMs)ms · \(result.fps)fps · gap p95 \(result.p95)ms/max \(result.maxGap)ms"
       note("→ " + line)
       report.append(line)
-      WearScope.track(.metric, "bench_stream", [
+      lastRun["warm_open"] = result.openMs
+      if shareResults {
+        WearScope.track(.metric, "bench_stream", [
         "res": name, "open_ms": "\(result.openMs)", "fps": result.fps,
-        "gap_p95_ms": "\(result.p95)", "gap_max_ms": "\(result.maxGap)",
-      ])
+          "gap_p95_ms": "\(result.p95)", "gap_max_ms": "\(result.maxGap)",
+        ])
+      }
     }
 
     // Still bench: 3 shots from the low warm stream
@@ -251,8 +261,11 @@ final class BenchEngine: ObservableObject {
       if photoSeq > seq0 {
         let ms = Int(Date().timeIntervalSince(t0) * 1000)
         out.append("photo \(i): \(ms)ms · \(lastBytes / 1024)KB · \(lastDims)")
-        WearScope.track(.photo, "bench_capture",
-                         ["ms": "\(ms)", "bytes": "\(lastBytes)", "res": lastDims])
+        lastRun["capture"] = ms
+        if shareResults {
+          WearScope.track(.photo, "bench_capture",
+                          ["ms": "\(ms)", "bytes": "\(lastBytes)", "res": lastDims])
+        }
       } else {
         out.append("photo \(i): not delivered within 15s")
       }

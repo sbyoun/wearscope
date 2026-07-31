@@ -3,6 +3,8 @@
 **Observability for smart-glasses apps.** Three lines, no signup: your session
 timeline appears in a browser, and your numbers sit next to everyone else's.
 
+**Dashboard & public data → [gs.foldalpha.com](https://gs.foldalpha.com)**
+
 ```swift
 WearScope.start()                                   // no key, no account
 WearScope.observeAudioRoutes()
