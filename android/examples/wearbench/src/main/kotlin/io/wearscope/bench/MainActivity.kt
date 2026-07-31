@@ -8,6 +8,7 @@ package io.wearscope.bench
 import android.Manifest
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.viewModels
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -58,7 +59,9 @@ class MainActivity : ComponentActivity() {
       }
 
   private var initialized = false
-  private lateinit var benchVm: BenchViewModel
+  // Activity-scoped so the permission callback can never outrun composition
+  // (the composable's viewModel() resolves to this same instance).
+  private val benchVm: BenchViewModel by viewModels()
 
   private fun initializeStack() {
     if (initialized) return
@@ -76,7 +79,6 @@ class MainActivity : ComponentActivity() {
     super.onCreate(savedInstanceState)
     setContent {
       val vm: BenchViewModel = viewModel()
-      benchVm = vm
       vm.requestCameraPermission = {
         val deferred = CompletableDeferred<Boolean>()
         pendingPermission = deferred
