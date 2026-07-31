@@ -24,6 +24,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -104,10 +105,18 @@ private fun BenchScreen(vm: BenchViewModel, onRegister: () -> Unit, onUnregister
   val running by vm.running.collectAsState()
   val audioReport by vm.audioReport.collectAsState()
   var showTimeline by remember { mutableStateOf(false) }
+  var showFleet by remember { mutableStateOf(false) }
+  val share by vm.shareResults.collectAsState()
+  val fleet by vm.fleet.collectAsState()
+  val mine by vm.lastRun.collectAsState()
 
   Scaffold { inner ->
     if (showTimeline) {
       TimelineScreen(Modifier.padding(inner), onBack = { showTimeline = false })
+      return@Scaffold
+    }
+    if (showFleet) {
+      FleetScreen(fleet, mine, Modifier.padding(inner), onBack = { showFleet = false })
       return@Scaffold
     }
     LazyColumn(
@@ -150,6 +159,24 @@ private fun BenchScreen(vm: BenchViewModel, onRegister: () -> Unit, onUnregister
       item { HorizontalDivider() }
 
       item { OutlinedButton(onClick = { showTimeline = true }) { Text("View event timeline") } }
+      item {
+        OutlinedButton(onClick = { vm.loadFleet(); showFleet = true }) {
+          Text("Compare with the fleet")
+        }
+      }
+      item {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+          Text("Share results to public leaderboard", style = MaterialTheme.typography.bodyMedium)
+          Switch(checked = share, onCheckedChange = { vm.setShareResults(it) })
+        }
+      }
+      item {
+        Text("Anonymous metrics only — timings, fps and resolutions. " +
+            "Turn this off and the device measures without contributing.",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+      }
     }
   }
 }
@@ -185,6 +212,42 @@ private fun TimelineScreen(modifier: Modifier = Modifier, onBack: () -> Unit) {
           if (explain.isNotEmpty()) {
             Text("💡 $explain", style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.error)
+          }
+        }
+      }
+    }
+  }
+}
+
+
+/** Public baselines with this run's numbers alongside — the reward for contributing. */
+@Composable
+private fun FleetScreen(
+    metrics: List<FleetMetric>,
+    mine: Map<String, Int>,
+    modifier: Modifier = Modifier,
+    onBack: () -> Unit,
+) {
+  Column(modifier.fillMaxSize().padding(16.dp)) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+      Text("Fleet comparison", style = MaterialTheme.typography.titleMedium)
+      OutlinedButton(onClick = onBack) { Text("Close") }
+    }
+    if (metrics.isEmpty()) {
+      Text("Loading public baselines…", style = MaterialTheme.typography.bodySmall)
+      return@Column
+    }
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+      items(metrics) { m ->
+        Column {
+          Text("${m.metric} (${m.unit})", style = MaterialTheme.typography.titleSmall)
+          mine[m.metric]?.let {
+            Text("this device: $it${m.unit}", style = MaterialTheme.typography.bodyMedium)
+          }
+          m.groups.forEach { g ->
+            Text("${g.key.take(18)} — p50 ${g.p50} · p90 ${g.p90} · n=${g.n}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
           }
         }
       }

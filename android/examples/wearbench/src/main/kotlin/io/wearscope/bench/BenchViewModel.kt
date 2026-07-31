@@ -48,6 +48,27 @@ class BenchViewModel(app: Application) : AndroidViewModel(app) {
   val summary = MutableStateFlow<String?>(null)
   val running = MutableStateFlow(false)
   val audioReport = MutableStateFlow<String?>(null)
+  /** Latest run, keyed by the metric names the public leaderboard uses. */
+  val lastRun = MutableStateFlow<Map<String, Int>>(emptyMap())
+  val fleet = MutableStateFlow<List<FleetMetric>>(emptyList())
+
+  private val prefs =
+      app.getSharedPreferences("wearbench", android.content.Context.MODE_PRIVATE)
+
+  /**
+   * Bench results feed the public leaderboard so everyone gets baselines.
+   * Opt out and this device stops contributing (it still measures locally).
+   */
+  val shareResults = MutableStateFlow(prefs.getBoolean("share_results", true))
+
+  fun setShareResults(on: Boolean) {
+    shareResults.value = on
+    prefs.edit().putBoolean("share_results", on).apply()
+  }
+
+  fun loadFleet() {
+    viewModelScope.launch(Dispatchers.IO) { fleet.value = Leaderboard.fetch() }
+  }
 
   private var deviceId: DeviceIdentifier? = null
   /** Wired up by MainActivity — needs the Meta AI deep-link round trip, so only possible with an Activity context. */
@@ -204,7 +225,8 @@ class BenchViewModel(app: Application) : AndroidViewModel(app) {
     var stopWait = 0L
     while (stream.state.value != StreamState.STOPPED && stopWait < 5_000) { delay(200); stopWait += 200 }
 
-    WearScope.track(WSEventType.METRIC, "bench_stream", mapOf(
+    lastRun.value = lastRun.value + ("warm_open" to openMs.toInt())
+    if (shareResults.value) WearScope.track(WSEventType.METRIC, "bench_stream", mapOf(
         "res" to label, "open_ms" to openMs.toString(),
         "fps" to String.format(java.util.Locale.US, "%.1f", fps), "frame_res" to res))
     return "$label: open ${openMs}ms · ${String.format(java.util.Locale.US, "%.1f", fps)}fps · $res"
@@ -228,7 +250,10 @@ class BenchViewModel(app: Application) : AndroidViewModel(app) {
       stream.capturePhoto()
           .onSuccess { photo ->
             val ms = System.currentTimeMillis() - t0
-            WearScopeDAT.trackPhoto(photo, ms)  // records latency, size, measured resolution
+            lastRun.value = lastRun.value + ("capture" to ms.toInt())
+            if (shareResults.value) {
+              WearScopeDAT.trackPhoto(photo, ms)  // latency, size, measured resolution
+            }
             line = "photo $i: ${ms}ms"
           }
           .onFailure { e, _ -> WearScope.trackError(e.toString(), "bench.photo") }
