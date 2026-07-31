@@ -24,7 +24,6 @@ public enum WearScopeDAT {
 
   private static var tokens: [any AnyListenerToken] = []
   private static var linkObserved = Set<String>()
-  private static var lastLinkState: [String: String] = [:]
 
   // MARK: - Wearables (registration · devices · environment)
 
