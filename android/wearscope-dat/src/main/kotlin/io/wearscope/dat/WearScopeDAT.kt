@@ -75,15 +75,18 @@ object WearScopeDAT {
     scope.launch {
       var named = false
       flow.collect { device ->
+        // Report the device TYPE, not the display name: names carry a per-unit
+        // serial ("RB Meta 029F") and differ across platforms, which would split
+        // one model into many keys and make fleet baselines meaningless.
+        val model = device.deviceType.name.lowercase()
         if (!named) {
           named = true
-          // glasses model name — the core segment key for fleet comparisons
-          WearScope.track(WSEventType.CUSTOM, "devices", mapOf("names" to device.name, "count" to "1"))
+          WearScope.track(WSEventType.CUSTOM, "devices", mapOf("models" to model, "count" to "1"))
         }
         val link = device.linkState.name.lowercase()
         if (linkStates.put(key, link) != link) {
           WearScope.track(WSEventType.SESSION_STATE, "link",
-              mapOf("device" to device.name, "state" to link))
+              mapOf("device" to model, "state" to link))
         }
       }
     }

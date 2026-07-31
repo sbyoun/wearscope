@@ -42,11 +42,14 @@ public enum WearScopeDAT {
       WearScope.track(.sessionState, "registration", ["state": state.description])
     })
     tokens.append(wearables.addDevicesListener { ids in
-      let names = ids.compactMap { wearables.deviceForIdentifier($0)?.nameOrId() }
+      // Report the device TYPE, not the display name: names carry a per-unit
+      // serial ("RB Meta 029F") and differ across platforms, which would split
+      // one model into many keys and make fleet baselines meaningless. Types are
+      // stable and identical everywhere — and carry no per-device identifier.
+      let models = Set(ids.compactMap { wearables.deviceForIdentifier($0)?.deviceType().rawValue })
       WearScope.track(.custom, "devices", [
         "count": "\(ids.count)",
-        // glasses model names — the core segment key for fleet comparisons
-        "names": names.joined(separator: ","),
+        "models": models.sorted().joined(separator: ","),   // fleet segment key
       ])
       Task { @MainActor in observeLinks(wearables: wearables, ids: ids) }
     })
@@ -102,10 +105,10 @@ public enum WearScopeDAT {
       guard !linkObserved.contains(key),
             let device = wearables.deviceForIdentifier(id) else { continue }
       linkObserved.insert(key)
-      let name = device.nameOrId()
-      trackLink(key: key, device: name, state: "\(device.linkState)")
+      let model = device.deviceType().rawValue
+      trackLink(key: key, device: model, state: "\(device.linkState)")
       tokens.append(device.addLinkStateListener { state in
-        Task { @MainActor in trackLink(key: key, device: name, state: "\(state)") }
+        Task { @MainActor in trackLink(key: key, device: model, state: "\(state)") }
       })
     }
   }
