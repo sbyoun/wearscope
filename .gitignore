@@ -1,0 +1,10 @@
+.build/
+.DS_Store
+.swiftpm/
+Examples/*/Secrets.xcconfig
+Examples/*/*.xcodeproj
+android/local.properties
+android/.gradle/
+android/**/build/
+**/build/
+.gradle/

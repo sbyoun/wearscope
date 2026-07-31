@@ -1,0 +1,84 @@
+# WearBench — WearScope example & diagnostics app.  Generate with `xcodegen generate`.
+#
+# Setup: copy Secrets.xcconfig.example → Secrets.xcconfig and fill in your
+# Wearables Developer Center app credentials (never commit the real file).
+
+name: WearBench
+options:
+  bundleIdPrefix: com.cjaiproduct
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+
+packages:
+  WearScope:
+    path: ../..
+  MetaWearablesDAT:
+    url: https://github.com/facebook/meta-wearables-dat-ios
+    exactVersion: 0.8.0
+
+targets:
+  WearBench:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+    dependencies:
+      - package: WearScope
+        product: WearScope
+      - package: WearScope
+        product: WearScopeDAT
+      - package: MetaWearablesDAT
+        product: MWDATCore
+      - package: MetaWearablesDAT
+        product: MWDATCamera
+    configFiles:
+      Debug: Secrets.xcconfig
+      Release: Secrets.xcconfig
+    info:
+      path: Sources/Info.plist
+      properties:
+        CFBundleDisplayName: WearBench
+        CFBundleShortVersionString: "0.3"
+        ITSAppUsesNonExemptEncryption: false
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        NSMicrophoneUsageDescription: Needed for the mic check (glasses/phone route and level measurement).
+        NSLocalNetworkUsageDescription: Needed for the glasses Wi-Fi streaming benchmark.
+        # DAT talks to the glasses over Bluetooth — without this string, device discovery fails silently
+        NSBluetoothAlwaysUsageDescription: Needed to connect to the smart glasses.
+        UIBackgroundModes:
+          - audio
+          - bluetooth-central
+          - bluetooth-peripheral
+        NSBonjourServices:
+          - _bonjour._tcp
+        CFBundleURLTypes:
+          - CFBundleTypeRole: Editor
+            CFBundleURLName: $(PRODUCT_BUNDLE_IDENTIFIER)
+            CFBundleURLSchemes:
+              - wearbench
+        MWDAT:
+          AppLinkURLScheme: wearbench://
+          MetaAppID: $(META_APP_ID)
+          ClientToken: $(CLIENT_TOKEN)
+          TeamID: $(DEVELOPMENT_TEAM)
+        WSAPIKey: $(WS_API_KEY)
+        WSEndpoint: $(WS_ENDPOINT)
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.cjaiproduct.wearbench
+        MARKETING_VERSION: "0.3"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: $(TEAM_ID)
+        META_APP_ID: $(MWDAT_APPLICATION_ID)
+        CLIENT_TOKEN: $(MWDAT_CLIENT_TOKEN)
+    entitlements:
+      path: Sources/WearBench.entitlements
+      properties:
+        com.apple.developer.networking.HotspotConfiguration: true
+        com.apple.developer.networking.wifi-info: true
