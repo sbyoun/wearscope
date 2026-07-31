@@ -1,12 +1,41 @@
 # WearScope
 
-**Observability SDK for smart-glasses apps** built on the Meta Wearables Device Access Toolkit (DAT).
+**Observability for smart-glasses apps.** Three lines, no signup: your session
+timeline appears in a browser, and your numbers sit next to everyone else's.
 
-Session lifecycles, stream health, capture latency, audio-route fallbacks, and DAT errors — captured with one line of setup, explained with a catalog of known failure modes, and replayable as a session timeline.
+```swift
+WearScope.start()                                   // no key, no account
+WearScope.observeAudioRoutes()
+WearScopeDAT.observe(wearables: Wearables.shared)   // → prints your dashboard URL
+```
 
-> Status: **v0.2 developer preview.** API may change. Built by developers who spent months debugging DAT apps and wished this existed.
+Session lifecycles, stream health, capture latency, audio-route fallbacks, and DAT
+errors — captured automatically, explained with a catalog of known failure modes,
+replayable as a timeline.
+
+> **Using a coding agent?** Point it at [`AGENTS.md`](AGENTS.md) — copy-paste
+> integration steps, the event taxonomy, hard rules, and how to verify it worked.
 >
-> 📖 **[The DAT Failure-Mode Encyclopedia](docs/failure-modes.md)** — field notes on every failure we hit on real hardware (`noEligibleDevice`, silent mic fallback, TLS -9802, …). Useful even without the SDK.
+> 📖 **[The DAT Failure-Mode Encyclopedia](docs/failure-modes.md)** — field notes on
+> every failure we hit on real hardware (`noEligibleDevice`, silent mic fallback,
+> TLS -9802, …). Useful even without the SDK.
+
+### What you get
+
+- **Your timeline, instantly.** First launch provisions an anonymous project and
+  prints a dashboard URL. No account, no project setup, nothing to configure.
+  Claim it into an account later, self-host, or stay local-only — nothing is locked in.
+- **Everyone's numbers, in the open.** Fleet baselines are public: how long a warm
+  stream open *usually* takes, capture latency by phone and glasses model, fps and
+  jitter across firmware versions. A number means nothing alone; ours come with a
+  distribution to sit in.
+- **Explanations, not just events.** Known DAT failures arrive with root cause and
+  fix attached, from a catalog built on real hardware.
+
+> Status: **v0.5 developer preview** — SDKs (iOS + Android) are dogfooded on real
+> hardware; the hosted cloud (anonymous provisioning, public baselines) is rolling
+> out. Without a reachable server the SDK records to a local file and retries next
+> launch, so integration never blocks your app.
 
 ## Why
 
@@ -21,8 +50,6 @@ Swift Package Manager:
 ```swift
 .package(url: "https://github.com/sbyoun/wearscope", from: "0.1.0")
 ```
-
-No signup, no dashboard tour before you have data: `start()` provisions an anonymous project on first launch, caches the key on device, and prints where to look. Claim it into an account later, self-host with `endpoint:`, or stay local-only — nothing is locked in.
 
 Requires iOS 17+. The `WearScope` core library has zero dependencies; the optional `WearScopeDAT` auto-instrumentation product depends on the Meta Wearables DAT package (0.8.0).
 
@@ -67,6 +94,21 @@ WearScope.trackError(error, context: "camera.session")
 - **Error catalog**: `trackError` recognizes known DAT failure modes (`noEligibleDevice`, `Superseded`, firmware mismatches, TLS quirks, …) and attaches an explanation — the debugging note you'd otherwise find after hours in the discussions.
 - **Privacy by design**: WearScope never collects payloads — no audio, video, photos, or transcripts. Metadata only, enforced at the API level (string attributes, 500-char cap).
 - **Environment-first**: every session carries device model, OS, app build, SDK/DAT versions, locale, and glasses model — so a number is never just a number; it's comparable across the fleet ("your warm-open is 18 s; typical is 6 s").
+
+## What the numbers look like
+
+Measured on one pair of Ray-Ban Meta glasses, same SDK, two phones (our own
+dogfooding — the kind of comparison the public baselines make routine):
+
+| | iOS (Wi-Fi transport) | Android (BT transport) |
+|---|---|---|
+| Still capture | **0.5–0.7 s** | **4.5–5.7 s** |
+| Stream open | 1–3 s (after device wait) | 1–3 s |
+| Streaming fps | 24 | 13–14 |
+| Frame resolution | 360×640 (low) | 504×896 (medium) |
+
+Same hardware, ~8× difference in capture latency depending on which phone is
+paired. That is the sort of thing nobody can tell you from a single device.
 
 ## Event types
 
