@@ -78,7 +78,7 @@ object WearScopeDAT {
         // Report the device TYPE, not the display name: names carry a per-unit
         // serial ("RB Meta 029F") and differ across platforms, which would split
         // one model into many keys and make fleet baselines meaningless.
-        val model = device.deviceType.name.lowercase()
+        val model = canonicalModel(device.deviceType.name)
         if (!named) {
           named = true
           WearScope.track(WSEventType.CUSTOM, "devices", mapOf("models" to model, "count" to "1"))
@@ -91,6 +91,14 @@ object WearScopeDAT {
       }
     }
   }
+
+  /**
+   * Canonical model slug — platforms spell the same device differently
+   * ("Ray-Ban Meta" vs "RAY_BAN_META"), which would split one model into several
+   * fleet groups. Lowercase alphanumerics only.
+   */
+  private fun canonicalModel(raw: String): String =
+      raw.lowercase().filter { it.isLetterOrDigit() }.ifBlank { "unknown" }
 
   // MARK: - Config preflight — catches "silent failures" in the first-run timeline
 

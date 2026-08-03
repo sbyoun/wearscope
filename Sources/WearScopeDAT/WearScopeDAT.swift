@@ -46,7 +46,9 @@ public enum WearScopeDAT {
       // serial ("RB Meta 029F") and differ across platforms, which would split
       // one model into many keys and make fleet baselines meaningless. Types are
       // stable and identical everywhere — and carry no per-device identifier.
-      let models = Set(ids.compactMap { wearables.deviceForIdentifier($0)?.deviceType().rawValue })
+      let models = Set(ids.compactMap {
+        wearables.deviceForIdentifier($0).map { canonicalModel($0.deviceType().rawValue) }
+      })
       WearScope.track(.custom, "devices", [
         "count": "\(ids.count)",
         "models": models.sorted().joined(separator: ","),   // fleet segment key
@@ -105,7 +107,7 @@ public enum WearScopeDAT {
       guard !linkObserved.contains(key),
             let device = wearables.deviceForIdentifier(id) else { continue }
       linkObserved.insert(key)
-      let model = device.deviceType().rawValue
+      let model = canonicalModel(device.deviceType().rawValue)
       trackLink(key: key, device: model, state: "\(device.linkState)")
       tokens.append(device.addLinkStateListener { state in
         Task { @MainActor in trackLink(key: key, device: model, state: "\(state)") }
