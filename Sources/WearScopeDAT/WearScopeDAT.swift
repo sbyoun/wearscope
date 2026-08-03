@@ -115,6 +115,14 @@ public enum WearScopeDAT {
     }
   }
 
+  /// Canonical model slug — platforms spell the same device differently
+  /// ("Ray-Ban Meta" vs "RAY_BAN_META"), which would split one model into several
+  /// fleet groups. Lowercase alphanumerics only.
+  nonisolated static func canonicalModel(_ raw: String) -> String {
+    let slug = raw.lowercased().filter { $0.isLetter || $0.isNumber }
+    return slug.isEmpty ? "unknown" : slug
+  }
+
   /// Deduplicate repeated same-state link callbacks — only transitions are worth a timeline row.
   private static var lastLinkState: [String: String] = [:]
 
