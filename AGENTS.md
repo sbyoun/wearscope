@@ -20,10 +20,11 @@ WearScope.start()                                   // no key, no signup
 WearScope.observeAudioRoutes()                      // glasses↔phone mic fallbacks
 
 // Right after Wearables.configure()
-WearScopeDAT.observe(wearables: Wearables.shared)   // registration, devices, link, preflight
+WearScopeDAT.observe(wearables: Wearables.shared)   // registration, devices, link, thermal, preflight
 
-// Wherever a camera stream is created, before/after start()
-WearScopeDAT.observe(stream: stream)                // state transitions, errors, photo arrivals
+// On the session you create, and on each camera stream
+WearScopeDAT.observe(session: session)              // state transitions with dwell time, errors
+WearScopeDAT.observe(stream: stream)                // state transitions, stalls, errors, photos
 WearScopeDAT.observeFrames(stream: stream)          // fps, inter-frame p95, measured resolution
 ```
 

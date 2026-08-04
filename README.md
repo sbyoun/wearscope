@@ -126,6 +126,11 @@ paired. That is the sort of thing nobody can tell you from a single device.
 
 `sessionState` · `stream` · `photo` · `audioRoute` · `thermal` · `error` · `metric` · `custom`
 
+Beyond recording what happened, the adapter flags states that contradict each other —
+a stream stuck in a transitional state while its session reports healthy, or frames
+still arriving after a stream stopped (the glasses camera was never released, so the
+next open hangs). Those are the shapes behind most "it just never starts" reports.
+
 ## Example app — WearBench
 
 [`Examples/WearBench`](Examples/WearBench) is the reference integration *and* a hardware

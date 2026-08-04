@@ -37,6 +37,9 @@ object WearScopeDAT {
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
   private val linkStates = ConcurrentHashMap<String, String>()
   private val observedDevices = ConcurrentHashMap.newKeySet<String>()
+  /** Last known session state per label — used to spot session/stream contradictions. */
+  private val sessionStates = ConcurrentHashMap<String, String>()
+  private val orphanReported = ConcurrentHashMap.newKeySet<String>()
 
   // MARK: - Wearables (preflight · registration · devices · links · env)
 
@@ -65,6 +68,7 @@ object WearScopeDAT {
         ids.forEach { observeDevice(it) }
       }
     }
+    observeThermal()
   }
 
   /** Track per-device name and link state (connected/disconnected) — "registered" is not "connected". */
@@ -87,6 +91,35 @@ object WearScopeDAT {
         if (linkStates.put(key, link) != link) {
           WearScope.track(WSEventType.SESSION_STATE, "link",
               mapOf("device" to model, "state" to link))
+        }
+      }
+    }
+  }
+
+  // MARK: - Thermal (glasses throttling shows up as fps drops and stalled streams)
+
+  /**
+   * Observe the glasses' thermal level. Throttling is a common hidden cause of
+   * degraded streaming, and nothing else in the app surfaces it.
+   */
+  fun observeThermal() {
+    scope.launch {
+      Wearables.devices.collect { ids ->
+        ids.firstOrNull()?.let { id ->
+          launch {
+            var last = ""
+            Wearables.getDeviceState(id).collect { state ->
+              val level = state.thermalLevel.name.lowercase()
+              if (level == last) return@collect
+              last = level
+              WearScope.track(WSEventType.THERMAL, "level", mapOf("level" to level))
+              if (level in setOf("severe", "critical", "emergency", "shutdown")) {
+                WearScope.trackError(
+                    "glasses thermal level $level — expect throttled fps and stalled streams",
+                    "dat.thermal")
+              }
+            }
+          }
         }
       }
     }
@@ -154,6 +187,7 @@ object WearScopeDAT {
             }
           }
           WearScope.track(WSEventType.SESSION_STATE, "session", attrs)
+          sessionStates[label] = name
           last = name
           t0 = System.currentTimeMillis()
         }
@@ -168,6 +202,30 @@ object WearScopeDAT {
 
   /** Record stream state transitions (dwell time) and errors. */
   fun observeStream(stream: Stream, label: String = "stream") {
+    // A stream that sits in a transitional state while everything else claims to be
+    // healthy is the shape of most "it just never starts" reports: surface the
+    // contradiction instead of waiting for a timeout.
+    scope.launch {
+      var reported = false
+      var seen = ""
+      var since = System.currentTimeMillis()
+      while (isActive && stream.state.value != StreamState.STOPPED) {
+        val name = stream.state.value.name.lowercase()
+        if (name != seen) { seen = name; since = System.currentTimeMillis(); reported = false }
+        val stuckMs = System.currentTimeMillis() - since
+        if (!reported && stuckMs > 15_000 && name != "streaming") {
+          reported = true
+          val session = sessionStates.values.firstOrNull()
+          WearScope.trackError(
+              "stream stuck in $name for ${stuckMs / 1000}s" +
+                  (session?.let { " while session is $it" } ?: ""),
+              "dat.$label.stall")
+          WearScope.track(WSEventType.STREAM, "stall",
+              mapOf("state" to name, "label" to label, "ms" to stuckMs.toString()))
+        }
+        delay(1_000)
+      }
+    }
     scope.launch {
       var last = ""
       var t0 = System.currentTimeMillis()
@@ -201,6 +259,14 @@ object WearScopeDAT {
     scope.launch {
       stream.videoStream.collect { frame ->
         stats.mark("${frame.width}x${frame.height}")
+        // Frames after stop mean the glasses camera was never released; the next
+        // open then hangs. Report once — invisible from the app side otherwise.
+        if (stream.state.value == StreamState.STOPPED && orphanReported.add(label)) {
+          WearScope.trackError(
+              "frames still arriving after the stream stopped — the glasses camera was not " +
+                  "released; the next stream open may hang (power-cycle the glasses to recover)",
+              "dat.$label.orphan")
+        }
       }
     }
     scope.launch {

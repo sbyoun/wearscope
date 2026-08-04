@@ -56,6 +56,7 @@ public enum WearScopeDAT {
       Task { @MainActor in observeLinks(wearables: wearables, ids: ids) }
     })
     observeLinks(wearables: wearables, ids: wearables.devices)
+    observeThermal(wearables: wearables)
   }
 
   /// Config preflight — catches "silent failures" in the first-run timeline.
@@ -115,6 +116,17 @@ public enum WearScopeDAT {
     }
   }
 
+  /// Report post-stop frame delivery once per stream label.
+  private static var orphanReported = Set<String>()
+
+  private static func reportOrphanFrames(label: String) {
+    guard orphanReported.insert(label).inserted else { return }
+    WearScope.trackError(
+      "frames still arriving after the stream stopped — the glasses camera was not released; "
+      + "the next stream open may hang (power-cycle the glasses to recover)",
+      context: "dat.\(label).orphan")
+  }
+
   /// Canonical model slug — platforms spell the same device differently
   /// ("Ray-Ban Meta" vs "RAY_BAN_META"), which would split one model into several
   /// fleet groups. Lowercase alphanumerics only.
@@ -130,6 +142,65 @@ public enum WearScopeDAT {
     guard lastLinkState[key] != state else { return }
     lastLinkState[key] = state
     WearScope.track(.sessionState, "link", ["device": device, "state": state])
+  }
+
+  // MARK: - Session (state transitions with dwell time · errors)
+
+  /// Observe a device session: every state transition with the time spent in the
+  /// previous state, plus session errors (explanations attached when known).
+  /// Pair with `observe(stream:)` — a session that is `.started` while its stream
+  /// never leaves `waitingForDevice` is a contradiction worth seeing.
+  public static func observe(session: DeviceSession, label: String = "session") {
+    tokens.append(session.errorPublisher.listen { error in
+      WearScope.trackError(error.description, context: "dat.\(label)")
+    })
+    sessionStates[label] = "\(session.state)"
+    Task { @MainActor [weak session] in
+      var last = ""
+      var t0 = Date()
+      while let s = session {
+        let state = "\(s.state)"
+        if state != last {
+          var attrs = ["state": state, "label": label]
+          if !last.isEmpty {
+            attrs["prev"] = last
+            attrs["ms_in_prev"] = String(Int(Date().timeIntervalSince(t0) * 1000))
+          }
+          WearScope.track(.sessionState, "session", attrs)
+          sessionStates[label] = state
+          last = state
+          t0 = Date()
+        }
+        if s.state == .stopped { break }
+        try? await Task.sleep(nanoseconds: 300_000_000)
+      }
+      sessionStates.removeValue(forKey: label)
+    }
+  }
+
+  /// Last known session state per label — used to spot session/stream contradictions.
+  private static var sessionStates: [String: String] = [:]
+
+  // MARK: - Thermal (glasses throttling shows up as fps drops and stalled streams)
+
+  /// Observe the glasses' thermal level. Throttling is a common hidden cause of
+  /// degraded streaming, and nothing else in the app surfaces it.
+  public static func observeThermal(wearables: any WearablesInterface) {
+    for id in wearables.devices {
+      Task { @MainActor in
+        var last = ""
+        for await state in wearables.deviceStateStream(for: id) {
+          let level = "\(state.thermalLevel)"
+          guard level != last else { continue }
+          last = level
+          WearScope.track(.thermal, "level", ["level": level])
+          if ["severe", "critical", "emergency", "shutdown"].contains(level) {
+            WearScope.trackError("glasses thermal level \(level) — expect throttled fps and stalled streams",
+                                 context: "dat.thermal")
+          }
+        }
+      }
+    }
   }
 
   // MARK: - Stream (state transitions · errors · photo arrivals)
@@ -154,9 +225,27 @@ public enum WearScopeDAT {
     Task { @MainActor [weak stream] in
       var last = ""
       var t0 = Date()
+      var stallReported = false
       while let s = stream {
         let state = "\(s.state)"
+        // A stream that sits in a transitional state while everything else claims
+        // to be healthy is the shape of most "it just never starts" reports:
+        // surface the contradiction instead of waiting for a timeout.
+        if state == last, !stallReported, state != "streaming", state != "stopped" {
+          let stuckFor = Date().timeIntervalSince(t0)
+          if stuckFor > 15 {
+            stallReported = true
+            var attrs = ["state": state, "label": label, "ms": String(Int(stuckFor * 1000))]
+            if let session = sessionStates.values.first { attrs["session"] = session }
+            WearScope.trackError(
+              "stream stuck in \(state) for \(Int(stuckFor))s"
+              + (attrs["session"].map { " while session is \($0)" } ?? ""),
+              context: "dat.\(label).stall")
+            WearScope.track(.stream, "stall", attrs)
+          }
+        }
         if state != last {
+          stallReported = false
           let attrs: [String: String] = last.isEmpty
             ? ["state": state, "label": label]
             : ["state": state, "label": label, "prev": last,
@@ -180,8 +269,13 @@ public enum WearScopeDAT {
                                    reportEvery seconds: UInt64 = 5,
                                    label: String = "stream") {
     let stats = FrameStats()
-    var frameToken: (any AnyListenerToken)? = stream.videoFramePublisher.listen { frame in
+    var frameToken: (any AnyListenerToken)? = stream.videoFramePublisher.listen { [weak stream] frame in
       stats.mark(dims: frameDims(frame))
+      // Frames after stop mean the glasses camera was never released; the next
+      // open then hangs. Report it once — it is invisible from the app side.
+      if let s = stream, s.state == .stopped {
+        Task { @MainActor in reportOrphanFrames(label: label) }
+      }
     }
     Task { @MainActor [weak stream] in
       defer { frameToken = nil }  // release the frame subscription with the stream
